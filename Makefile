@@ -7,6 +7,8 @@ package: build
 		icon.png \
 		info.plist
 
-build:
+build: clean
 	go build .
 
+clean:
+	rm *.alfredworkflow && rm honeycomb-alfred
