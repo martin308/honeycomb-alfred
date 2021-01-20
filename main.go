@@ -54,10 +54,6 @@ func init() {
 		update.GitHub(repo))
 }
 
-func set(key string) error {
-	return wf.Keychain.Set(account, key)
-}
-
 func run() {
 	ctx := context.Background()
 	wf.Args() // call to handle any magic actions
@@ -68,7 +64,7 @@ func run() {
 	}
 
 	if key != "" {
-		if err := set(key); err != nil {
+		if err := wf.Keychain.Set(account, key); err != nil {
 			wf.FatalError(err)
 		}
 		return
