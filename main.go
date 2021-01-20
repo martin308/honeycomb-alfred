@@ -9,11 +9,13 @@ import (
 	"time"
 
 	aw "github.com/deanishe/awgo"
+	"github.com/deanishe/awgo/update"
 	"go.deanishe.net/fuzzy"
 )
 
 const (
 	account = "honeycomb.io"
+	repo    = "honeycomb/honeycomb-alfred"
 )
 
 var (
@@ -23,17 +25,21 @@ var (
 
 	// Command-line flags
 	doDownload bool
+	doCheck    bool
 	query      string
 	key        string
 
 	// Workflow
 	sopts []fuzzy.Option
 	wf    *aw.Workflow
+
+	iconAvailable = &aw.Icon{Value: "update-available.png"}
 )
 
 func init() {
 	flag.BoolVar(&doDownload, "download", false, "retrieve list of datasets from Honeycomb")
 	flag.StringVar(&key, "set", "", "set the honeycomb api key")
+	flag.BoolVar(&doCheck, "check", false, "check for a new version")
 
 	// Set some custom fuzzy search options
 	sopts = []fuzzy.Option{
@@ -44,7 +50,8 @@ func init() {
 	}
 	wf = aw.New(aw.HelpURL("https://www.honeycomb.io/"),
 		aw.MaxResults(maxResults),
-		aw.SortOptions(sopts...))
+		aw.SortOptions(sopts...),
+		update.GitHub(repo))
 }
 
 func set(key string) error {
@@ -67,6 +74,15 @@ func run() {
 		return
 	}
 
+	if doCheck {
+		wf.Configure(aw.TextErrors(true))
+		log.Println("Checking for updates...")
+		if err := wf.CheckForUpdate(); err != nil {
+			wf.FatalError(err)
+		}
+		return
+	}
+
 	if doDownload {
 		wf.Configure(aw.TextErrors(true))
 		key, err := wf.Keychain.Get(account)
@@ -83,6 +99,24 @@ func run() {
 		}
 		log.Printf("[main] downloaded dataset list")
 		return
+	}
+
+	if wf.UpdateCheckDue() && !wf.IsRunning("check-update") {
+		log.Println("Running update check in background...")
+
+		cmd := exec.Command(os.Args[0], "-check")
+		if err := wf.RunInBackground("check-update", cmd); err != nil {
+			log.Printf("Error starting update check: %s", err)
+		}
+	}
+
+	if query == "" && wf.UpdateAvailable() {
+		wf.Configure(aw.SuppressUIDs(true))
+		wf.NewItem("Update available!").
+			Subtitle("↩ to install").
+			Autocomplete("workflow:update").
+			Valid(false).
+			Icon(iconAvailable)
 	}
 
 	log.Printf("[main] query=%s", query)
