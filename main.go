@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"time"
@@ -30,11 +31,16 @@ var (
 	key        string
 
 	// Workflow
-	sopts []fuzzy.Option
-	wf    *aw.Workflow
+	sopts  []fuzzy.Option
+	wf     *aw.Workflow
+	config *Configuration
 
 	iconAvailable = &aw.Icon{Value: "update-available.png"}
 )
+
+type Configuration struct {
+	APIHost, UIHost string
+}
 
 func init() {
 	flag.BoolVar(&doDownload, "download", false, "retrieve list of datasets from Honeycomb")
@@ -57,6 +63,16 @@ func init() {
 func run() {
 	ctx := context.Background()
 	wf.Args() // call to handle any magic actions
+
+	config = &Configuration{}
+
+	// Update config from environment variables
+	if err := wf.Config.To(config); err != nil {
+		wf.FatalError(err)
+	}
+
+	log.Printf("loaded: %#v", config)
+
 	flag.Parse()
 
 	if args := flag.Args(); len(args) > 0 {
@@ -86,7 +102,22 @@ func run() {
 			wf.FatalError(err)
 		}
 		log.Printf("[main] downloading dataset list...")
-		datasets, err := fetchDatasets(ctx, key)
+
+		ui, err := url.Parse(config.UIHost)
+
+		if err != nil {
+			wf.FatalError(err)
+		}
+
+		api, err := url.Parse(config.APIHost)
+
+		if err != nil {
+			wf.FatalError(err)
+		}
+
+		log.Print(ui, api)
+
+		datasets, err := fetchDatasets(ctx, ui, api, key)
 		if err != nil {
 			wf.FatalError(err)
 		}
@@ -150,9 +181,16 @@ func run() {
 
 	// Add results for cached datasets
 	for _, d := range datasets {
+		arg, err := d.URL()
+
+		if err != nil {
+			log.Printf("Bad URL: %#v", err)
+			continue
+		}
+
 		wf.NewItem(d.Name).
 			Subtitle(d.Team.Slug).
-			Arg(d.URL()).
+			Arg(arg).
 			UID(d.UID()).
 			Valid(true)
 	}

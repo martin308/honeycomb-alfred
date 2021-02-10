@@ -18,8 +18,6 @@ const (
 )
 
 var (
-	api, _ = url.Parse("https://api.honeycomb.io")
-	web, _ = url.Parse("https://ui.honeycomb.io")
 	client *http.Client
 )
 
@@ -38,7 +36,8 @@ func init() {
 }
 
 type Team struct {
-	Slug string `json:"team_slug"`
+	Slug   string `json:"team_slug"`
+	UIHost *url.URL
 }
 
 type Dataset struct {
@@ -51,22 +50,26 @@ func (d *Dataset) UID() string {
 	return fmt.Sprintf("%s-%s", d.Team.Slug, d.Slug)
 }
 
-func (d *Dataset) URL() string {
+func (d *Dataset) URL() (string, error) {
 	path := path.Join(d.Team.Slug, "home", d.Slug)
 
-	u, _ := web.Parse(path)
+	u, err := d.Team.UIHost.Parse(path)
 
-	return u.String()
+	if err != nil {
+		return "", err
+	}
+
+	return u.String(), nil
 }
 
-func fetchDatasets(ctx context.Context, key string) ([]*Dataset, error) {
-	t, err := fetchTeam(ctx, key)
+func fetchDatasets(ctx context.Context, ui, api *url.URL, key string) ([]*Dataset, error) {
+	t, err := fetchTeam(ctx, ui, api, key)
 
 	if err != nil {
 		return nil, err
 	}
 
-	req, err := request(ctx, datasets, key)
+	req, err := request(ctx, api, datasets, key)
 
 	if err != nil {
 		return nil, err
@@ -85,8 +88,8 @@ func fetchDatasets(ctx context.Context, key string) ([]*Dataset, error) {
 	return datasets, nil
 }
 
-func fetchTeam(ctx context.Context, key string) (*Team, error) {
-	req, err := request(ctx, team, key)
+func fetchTeam(ctx context.Context, ui, api *url.URL, key string) (*Team, error) {
+	req, err := request(ctx, api, team, key)
 
 	if err != nil {
 		return nil, err
@@ -98,11 +101,13 @@ func fetchTeam(ctx context.Context, key string) (*Team, error) {
 		return nil, err
 	}
 
+	t.UIHost = ui
+
 	return &t, nil
 }
 
-func request(ctx context.Context, path, key string) (*http.Request, error) {
-	url, err := api.Parse(path)
+func request(ctx context.Context, u *url.URL, path, key string) (*http.Request, error) {
+	url, err := u.Parse(path)
 
 	if err != nil {
 		return nil, err

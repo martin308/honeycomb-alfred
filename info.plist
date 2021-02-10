@@ -189,6 +189,13 @@
 			<integer>110</integer>
 		</dict>
 	</dict>
+	<key>variables</key>
+	<dict>
+		<key>API_HOST</key>
+		<string>https://api.honeycomb.io</string>
+		<key>UI_HOST</key>
+		<string>https://ui.honeycomb.io</string>
+	</dict>
 	<key>version</key>
 	<string>0.1</string>
 	<key>webaddress</key>
