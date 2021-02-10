@@ -11,4 +11,4 @@ build: clean
 	go build .
 
 clean:
-	rm *.alfredworkflow && rm honeycomb-alfred
+	rm -f *.alfredworkflow && rm -f honeycomb-alfred
